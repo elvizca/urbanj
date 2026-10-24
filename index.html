@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fef5f1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Urban J">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Urban J · Inventario</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="splash" class="hold" aria-hidden="true">
+  <div class="sp-stage">
+    <div class="sp-logo">
+      <div class="sp-chispas"><svg style="--x:8%;--y:20%;--s:28px;--d:1.85s;--c:#ff9a9a" viewBox="0 0 24 24"><path d="M12 0C13 7 17 11 24 12C17 13 13 17 12 24C11 17 7 13 0 12C7 11 11 7 12 0Z"/></svg><svg style="--x:90%;--y:14%;--s:21px;--d:2.0s;--c:#ff5757" viewBox="0 0 24 24"><path d="M12 0C13 7 17 11 24 12C17 13 13 17 12 24C11 17 7 13 0 12C7 11 11 7 12 0Z"/></svg><svg style="--x:15%;--y:78%;--s:18px;--d:2.15s;--c:#eec59f" viewBox="0 0 24 24"><path d="M12 0C13 7 17 11 24 12C17 13 13 17 12 24C11 17 7 13 0 12C7 11 11 7 12 0Z"/></svg><svg style="--x:82%;--y:82%;--s:32px;--d:1.9s;--c:#ffd9c8" viewBox="0 0 24 24"><path d="M12 0C13 7 17 11 24 12C17 13 13 17 12 24C11 17 7 13 0 12C7 11 11 7 12 0Z"/></svg><svg style="--x:52%;--y:-6%;--s:16px;--d:2.3s;--c:#ff9a9a" viewBox="0 0 24 24"><path d="M12 0C13 7 17 11 24 12C17 13 13 17 12 24C11 17 7 13 0 12C7 11 11 7 12 0Z"/></svg><svg style="--x:97%;--y:55%;--s:16px;--d:2.25s;--c:#eec59f" viewBox="0 0 24 24"><path d="M12 0C13 7 17 11 24 12C17 13 13 17 12 24C11 17 7 13 0 12C7 11 11 7 12 0Z"/></svg><svg style="--x:2%;--y:50%;--s:21px;--d:2.05s;--c:#ff5757" viewBox="0 0 24 24"><path d="M12 0C13 7 17 11 24 12C17 13 13 17 12 24C11 17 7 13 0 12C7 11 11 7 12 0Z"/></svg></div>
+      <img class="sp-palabra" src="splash-palabra.svg" alt="">
+      <img class="sp-estrella" src="splash-estrella.svg" alt="">
+      <i class="sp-shine"></i>
+    </div>
+    <div class="sp-line"></div>
+    <div class="sp-name">BOUTIQUE</div>
+    <div class="sp-tag">MODA · ESTILO · TENDENCIA</div>
+  </div>
+</div>
+<div class="app">
+  <aside class="side">
+    <div class="brand" id="brand"></div>
+    <nav id="nav"></nav>
+    <div class="side-foot"><span id="saveState">—</span></div>
+  </aside>
+  <div class="mainwrap">
+    <header class="top">
+      <button class="ibtn menu-btn" id="menuBtn" aria-label="Menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div class="tt"><h1 id="pageTitle"></h1><span id="today"></span></div>
+      <div class="top-r" id="topR"></div>
+    </header>
+    <main id="main"></main>
+  </div>
+</div>
+<div id="toasts"></div>
+<script src="logo-default.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="nube-config.js"></script>
+<script src="nube.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

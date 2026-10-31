@@ -1,0 +1,75 @@
+{
+ "fecha": "2026-10-31T16:24:54.952Z",
+ "files": [
+  {
+   "path": "app.js",
+   "sha256": "efa4aac8f544b22430edb3eefcf13d16326076602c54a8cebab12f09bcc1f4e9",
+   "size": 141206
+  },
+  {
+   "path": "fonts/OFL.txt",
+   "sha256": "061402327a96aadb0bfb694a960ed289ecd38d383e396243831ab81feb109c41",
+   "size": 4394
+  },
+  {
+   "path": "fonts/Roboto.ttf",
+   "sha256": "d7598e12c5dbef095ff8272cfc55da0250bd07fbdecbac8a530b9b277872a134",
+   "size": 488584
+  },
+  {
+   "path": "icon.png",
+   "sha256": "1a578c7da1de29aa8217de1ac314c0a2f2f3a0c1bf348b0efc1f333679b880e3",
+   "size": 10434
+  },
+  {
+   "path": "index.html",
+   "sha256": "14e7f0184f88807cb974f28042b39a313e8c3b53bda01e9e9a091482c1fa8c30",
+   "size": 3376
+  },
+  {
+   "path": "intro.mp3",
+   "sha256": "506aa1b02988787f9d0f959285244aad4ab1b31eeeeb741b93a5df124a969a18",
+   "size": 104741
+  },
+  {
+   "path": "logo-default.js",
+   "sha256": "1c14b2e0e2ce5e1f04522f4b273b7dcd9bfc22a00bc7a59ae76509fab64a1cec",
+   "size": 31367
+  },
+  {
+   "path": "manifest.webmanifest",
+   "sha256": "b203f80976001ea58feb00b1bdbe82614b755e06f7c4bb8ea476f98f0478bfc5",
+   "size": 246
+  },
+  {
+   "path": "nube-config.js",
+   "sha256": "8c9d504ca3e4380441632b6799dba97d80576b56eada258db81d5f0de35f271c",
+   "size": 488
+  },
+  {
+   "path": "nube.js",
+   "sha256": "3d1ffae124755d64250a1505f4355c2d466d10c8852d06d619047626ce7d5d8a",
+   "size": 16068
+  },
+  {
+   "path": "splash-estrella.svg",
+   "sha256": "30af254accdf88f5cfa517d55a64962e6e3ef9eae3117e4414ec24248bd2a553",
+   "size": 379
+  },
+  {
+   "path": "splash-palabra.svg",
+   "sha256": "9e8c4d3ab2dec509e158991d5d365ecc9c3757a174e0b9cc71bf14264e3ab947",
+   "size": 11431
+  },
+  {
+   "path": "styles.css",
+   "sha256": "3fb56349441055ec63cfdea32116a3eaef54d56141b06bd13968ffd713193eaf",
+   "size": 25776
+  },
+  {
+   "path": "vendor/supabase.js",
+   "sha256": "ee3be8de192b97cb1d73d1e95d6b82bb1f6b658c0f97c4ef757fc331996ed3d3",
+   "size": 218252
+  }
+ ]
+}

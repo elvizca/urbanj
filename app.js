@@ -1317,7 +1317,9 @@ V.config = {
       <p class="muted" style="margin-top:0">Todo se guarda automáticamente en este computador, con un respaldo diario (se conservan los últimos 60 días).<br><span class="small" id="cPath"></span></p>
       <div class="toolbar"><button class="btn pri" id="cExp">${ic('down')} Exportar respaldo</button><button class="btn" id="cImp">Restaurar respaldo</button><button class="btn" id="cDir">Abrir carpeta de datos</button>
       <span class="sp"></span><button class="btn" id="cDemo">Cargar ejemplo</button><button class="btn danger" id="cBorrar">Borrar todo</button></div>
-      <p class="note">Consejo: exporta un respaldo cada semana a una USB o a Google Drive. Si se daña el computador, con ese archivo recuperas todo.</p></div>`;
+      <p class="note">Consejo: exporta un respaldo cada semana a una USB o a Google Drive. Si se daña el computador, con ese archivo recuperas todo.</p></div>
+    ${bridge.appVersion ? `<div class="card mt"><h3>Versión de la app</h3><p class="muted" style="margin-top:0">La app se actualiza sola desde internet: al abrirla y cada 30 minutos busca una versión nueva. Actualizar no toca tus datos.<br><span class="small" id="cVer"></span></p>
+      <div class="toolbar"><button class="btn" id="cUpd">Buscar actualización</button></div></div>` : ''}`;
   },
   bind(m) {
     const c = cfg();
@@ -1381,6 +1383,17 @@ V.config = {
       DB = fixDB(d); await save(); toast('Respaldo restaurado'); go('inicio');
     };
     $('#cDir', m).onclick = () => bridge.openDataDir();
+    if ($('#cUpd', m)) {
+      const verTxt = async () => { const v = await bridge.appVersion(); const e = $('#cVer', m); if (e) e.textContent = v.fecha ? `Versión del ${fHora(v.fecha)}${v.instalada ? ' (la del instalador)' : ''}${v.lista ? ' · hay una nueva lista' : ''}` : ''; };
+      verTxt();
+      $('#cUpd', m).onclick = async () => {
+        const b = $('#cUpd', m); b.disabled = true; b.textContent = 'Buscando…';
+        const r = await bridge.checkUpdate();
+        b.disabled = false; b.textContent = 'Buscar actualización';
+        if (r === 'lista') avisoActualizacion(); else toast(r === 'al-dia' ? 'Ya tienes la última versión' : 'No se pudo revisar (¿sin internet?)', r === 'al-dia' ? 'ok' : 'bad');
+        verTxt();
+      };
+    }
     $('#cDemo', m).onclick = async () => { if (DB.productos.length && !await ask('Cargar el ejemplo <b>reemplaza todos los datos actuales</b>.', { ok: 'Cargar ejemplo', danger: true })) return; cargarDemo(); };
     $('#cBorrar', m).onclick = () => {
       const b = modal({ title: 'Borrar todo', body: `<p class="ask">Se eliminan productos, ventas, entradas, caja y proveedores. Se conserva la configuración (nombre, logo, listas).<br><br>Escribe <b>BORRAR</b> para confirmar. (Antes, exporta un respaldo si lo necesitas.)</p><input class="inp" id="bTxt" style="margin-top:10px">
@@ -1462,6 +1475,23 @@ async function cargarDemo() {
   DB.movimientos.sort((a, b) => a.fecha.localeCompare(b.fecha));
   await save(); toast('Datos de ejemplo cargados'); go('inicio');
 }
+
+/* ---------- actualización automática (app de escritorio) ----------
+   main.js baja la versión nueva de las pantallas y avisa aquí. Los datos no se tocan:
+   antes de recargar se suben a la nube los cambios pendientes. */
+async function aplicarActualizacion() {
+  if (typeof nubeSubir === 'function' && NUBE.perfil) await nubeSubir().catch(() => {});
+  bridge.applyUpdate();
+}
+function avisoActualizacion() {
+  if ($('#updBar')) return;
+  const b = document.createElement('div'); b.id = 'updBar'; b.className = 'upd-bar';
+  b.innerHTML = `<span>✦ Hay una versión nueva de Urban J</span><button class="btn sm acc" id="updOk">Actualizar ahora</button><button class="ibtn" id="updX" title="Más tarde (se actualiza sola al volver a abrir la app)">×</button>`;
+  document.body.appendChild(b);
+  $('#updOk', b).onclick = aplicarActualizacion;
+  $('#updX', b).onclick = () => { b.remove(); toast('Se actualizará al volver a abrir la app'); };
+}
+if (bridge.onUpdate) bridge.onUpdate(avisoActualizacion);
 
 /* ---------- intro de apertura ---------- */
 function introSplash() {

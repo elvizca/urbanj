@@ -236,6 +236,8 @@ img.th{object-fit:contain}
 .toast{background:var(--carbon);color:#fff;padding:11px 16px;border-radius:11px;box-shadow:0 8px 24px rgba(0,0,0,.2);font-weight:500;animation:pop .2s;max-width:380px}
 .toast.bad{background:var(--bad)}
 .toast.ok::before{content:'✓ ';color:var(--acc);font-weight:700}
+.upd-bar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:290;display:flex;align-items:center;gap:12px;background:var(--carbon);color:#fff;padding:9px 10px 9px 18px;border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.25);font-weight:600;animation:pop .2s}
+.upd-bar .ibtn{color:#fff}
 
 .welcome{max-width:640px;margin:40px auto;text-align:center}
 .welcome h2{font-size:44px;text-transform:uppercase;line-height:1}

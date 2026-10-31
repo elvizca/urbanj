@@ -58,6 +58,7 @@ const ICONS = {
   caja: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/>',
   proveedores: '<path d="M1 6h13v10H1zM14 9h4l3 3v4h-7"/><circle cx="5.5" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/>',
   reportes: '<path d="M4 20V11M10 20V4M16 20v-7M22 20H2"/>',
+  inversion: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
   config: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
@@ -91,9 +92,10 @@ function emptyDB() {
       ],
       colores: ['Negro', 'Blanco', 'Gris', 'Beige', 'Azul', 'Verde', 'Rojo'],
       metodos: ['Efectivo', 'Nequi', 'Daviplata', 'Transferencia', 'Tarjeta'],
+      costosExtra: [{ id: 'marquillas', nombre: 'Marquillas', valor: 0 }, { id: 'etiquetas', nombre: 'Etiquetas', valor: 0 }, { id: 'bolsas', nombre: 'Bolsas', valor: 0 }, { id: 'envios', nombre: 'Envíos', valor: 0 }],
       seq: { prod: 1, venta: 1, compra: 1 }
     },
-    proveedores: [], productos: [], movimientos: [], compras: [], ventas: [], cajas: [], cajaMovs: []
+    proveedores: [], productos: [], movimientos: [], compras: [], ventas: [], cajas: [], cajaMovs: [], inversiones: []
   };
 }
 function fixDB(d) {
@@ -130,6 +132,9 @@ const prodById = id => DB.productos.find(p => p.id === id);
 const varById = (p, vid) => p && p.variantes.find(v => v.id === vid);
 const provById = id => DB.proveedores.find(p => p.id === id);
 const stockTotal = p => sum(p.variantes, v => v.stock);
+/* costos adicionales (marquillas, bolsas…): se suman al precio de venta y cuentan como costo */
+const extrasTot = p => sum(p.extras || [], e => e.valor);
+const costoTot = p => n0(p.costo) + extrasTot(p);
 const varName = v => [v.talla, v.color].filter(Boolean).join(' · ') || 'Única';
 function grupoSugerido(cat) {
   const c = norm(cat), gs = cfg().gruposTallas, f = re => (gs.find(g => re.test(norm(g.nombre))) || {}).nombre;
@@ -298,7 +303,7 @@ function picker(box, onPick, { placeholder = 'Buscar producto por nombre, refere
 
 /* ---------- navegación ---------- */
 const V = {};
-const NAV = [['inicio', 'Inicio'], ['vender', 'Vender'], ['productos', 'Productos'], ['entradas', 'Entradas'], ['movimientos', 'Movimientos'], ['ventas', 'Ventas'], ['caja', 'Caja'], ['proveedores', 'Proveedores'], ['reportes', 'Reportes'], ['config', 'Configuración']];
+const NAV = [['inicio', 'Inicio'], ['vender', 'Vender'], ['productos', 'Productos'], ['entradas', 'Entradas'], ['inversion', 'Inversión'], ['movimientos', 'Movimientos'], ['ventas', 'Ventas'], ['caja', 'Caja'], ['proveedores', 'Proveedores'], ['reportes', 'Reportes'], ['config', 'Configuración']];
 
 function go(view) { VIEW = view; render(); }
 function render() {
@@ -474,7 +479,7 @@ async function cobrar() {
   if (POS.metodo === 'Efectivo' && POS.recibido && n0(POS.recibido) < t.total) { toast('El efectivo recibido no alcanza', 'bad'); return; }
   const venta = {
     id: uid(), num: nextNum('venta', 'V', 5), fecha: nowISO(), cliente: POS.cliente.trim(),
-    items: POS.cart.map(i => { const p = prodById(i.pid), v = varById(p, i.vid); return { pid: p.id, vid: v.id, nombre: p.nombre, ref: p.ref, categoria: p.categoria, talla: v.talla, variante: varName(v), cant: i.cant, precio: i.precio, costo: n0(p.costo) }; }),
+    items: POS.cart.map(i => { const p = prodById(i.pid), v = varById(p, i.vid); return { pid: p.id, vid: v.id, nombre: p.nombre, ref: p.ref, categoria: p.categoria, talla: v.talla, variante: varName(v), cant: i.cant, precio: i.precio, costo: costoTot(p) }; }),
     subtotal: t.sub, descuento: t.desc, total: t.total,
     pago: { metodo: POS.metodo, recibido: POS.metodo === 'Efectivo' && POS.recibido ? n0(POS.recibido) : t.total, cambio: POS.metodo === 'Efectivo' && POS.recibido ? n0(POS.recibido) - t.total : 0 },
     cajaId: cajaAbierta()?.id || null, anulada: false
@@ -556,10 +561,10 @@ V.productos = {
       list.sort((a, b) => a.nombre.localeCompare(b.nombre));
       const tu = sum(list, stockTotal), tc = sum(list, p => Math.max(0, stockTotal(p)) * p.costo), tp = sum(list, p => Math.max(0, stockTotal(p)) * p.precio);
       $('#pTabla').innerHTML = list.length ? `<table class="t"><thead><tr><th>Producto</th><th>Categoría</th><th>Proveedor</th><th class="r">Costo</th><th class="r">Precio</th><th class="r">Margen</th><th>Stock por talla</th><th class="r">Total</th><th></th></tr></thead><tbody>
-        ${list.map(p => { const mg = p.precio ? (p.precio - p.costo) / p.precio : 0; const s = stockTotal(p); return `<tr class="click" data-id="${p.id}">
+        ${list.map(p => { const mg = p.precio ? (p.precio - costoTot(p)) / p.precio : 0; const s = stockTotal(p); return `<tr class="click" data-id="${p.id}">
           <td><div class="pcell"><span class="thw" data-ph="${p.id}" title="${p.foto ? 'Ver foto' : 'Agregar foto (clic o arrastra una imagen)'}">${thumb(p)}${p.foto ? '' : `<i>${ic('camera')}</i>`}</span><div><b>${esc(p.nombre)}</b><small>${esc(p.ref)}</small></div></div></td>
           <td>${esc(p.categoria || '—')}</td><td class="small">${esc(provById(p.proveedorId)?.nombre || '—')}</td>
-          <td class="r num">${money(p.costo)}</td><td class="r num b">${money(p.precio)}</td>
+          <td class="r num">${money(p.costo)}${extrasTot(p) ? `<br><small class="muted" title="${esc((p.extras || []).map(e => e.nombre + ' ' + money(e.valor)).join(' · '))}">+ ${money(extrasTot(p))} adic.</small>` : ''}</td><td class="r num b">${money(p.precio)}</td>
           <td class="r"><span class="badge ${mg < .3 ? 'warn' : 'ok'}">${pct(mg)}</span></td>
           <td><div class="chips">${ordenarVariantes(p.variantes).map(v => `<span class="vchip ${n0(v.stock) <= minOf(v) ? 'low' : ''}" title="${esc(varName(v))} · mín. ${minOf(v)}">${esc(v.talla || 'Ú')}${v.color && new Set(p.variantes.map(x => x.color)).size > 1 ? ' ' + esc(v.color.slice(0, 3)) : ''}: ${v.stock}</span>`).join('')}</div></td>
           <td class="r b num">${int(s)}</td>
@@ -621,6 +626,10 @@ function editarProducto(p, onSaved) {
   const refSug = `${c.prefijo || 'UJ'}-${String(c.seq.prod).padStart(3, '0')}`;
   const d = p ? { ...p } : { ref: refSug, nombre: '', categoria: c.categorias[0] || '', proveedorId: '', costo: '', precio: '', foto: '', notas: '' };
   let rows = p ? p.variantes.map(v => ({ ...v, _ex: true })) : [];
+  // costos adicionales: el campo precio es el precio SIN ellos; al guardar, precio = base + costos marcados
+  const exSel = new Set((p && p.extras || []).map(e => e.id));
+  const exLista = [...(c.costosExtra || []), ...(p && p.extras || []).filter(e => !(c.costosExtra || []).some(x => x.id === e.id))];
+  if (p) d.precio = p.precioBase ?? n0(p.precio) - extrasTot(p);
   const selT = new Set(rows.map(r => r.talla).filter(Boolean)), selC = new Set(rows.map(r => r.color).filter(Boolean));
   const colores = [...new Set([...c.colores, ...selC])];
   const m = modal({ title: nuevo ? 'Nuevo producto' : 'Editar producto', size: 'wide', body: `
@@ -634,6 +643,9 @@ function editarProducto(p, onSaved) {
         <label class="f">Proveedor<select class="inp" id="eProv"><option value="">— Sin proveedor —</option>${DB.proveedores.map(x => `<option value="${x.id}" ${x.id === d.proveedorId ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></label>
         <label class="f"><span>Costo por unidad <span class="h">lo que te cuesta a ti</span></span><input class="inp" id="eCosto" type="number" min="0" step="100" value="${d.costo}"></label>
         <label class="f"><span>Precio de venta <span class="h" id="eMg"></span></span><input class="inp" id="ePrecio" type="number" min="0" step="1000" value="${d.precio}"></label>
+        <div class="f s2"><span>Costos adicionales <span class="h">marca los que lleva este producto: su valor se suma al precio de venta</span></span>
+          ${exLista.length ? `<div class="tog" id="eEx">${exLista.map(e => `<button type="button" data-x="${esc(e.id)}" class="${exSel.has(e.id) ? 'on' : ''}">${esc(e.nombre)} · ${money(e.valor)}</button>`).join('')}</div>` : '<span class="muted small">No hay costos adicionales. Créalos en <b>Configuración</b>.</span>'}
+          <div class="small" id="eFinal" style="margin-top:6px"></div></div>
         <label class="f s2"><span>Notas <span class="h">tela, estampado, temporada… (opcional)</span></span><input class="inp" id="eNotas" value="${esc(d.notas || '')}"></label>
       </div>
     </div>
@@ -646,8 +658,15 @@ function editarProducto(p, onSaved) {
     <div id="eRows"></div>
     <div class="mfoot"><span class="sp muted small">${nuevo ? 'El stock inicial queda registrado como movimiento.' : 'Para cambiar el stock usa <b>Entradas</b> o un <b>ajuste</b> en Movimientos.'}</span><button class="btn ghost" data-close>Cancelar</button><button class="btn pri" id="eSave">Guardar producto</button></div>` });
   const el = m.el;
-  const updMg = () => { const co = n0($('#eCosto', el).value), pr = n0($('#ePrecio', el).value); $('#eMg', el).textContent = pr ? `margen ${pct((pr - co) / pr)} · ganas ${money(pr - co)}` : ''; };
-  $('#eCosto', el).oninput = $('#ePrecio', el).oninput = updMg; updMg();
+  const extrasSel = () => exLista.filter(e => $(`#eEx [data-x="${CSS.escape(e.id)}"].on`, el)).map(e => ({ id: e.id, nombre: e.nombre, valor: n0(e.valor) }));
+  const updMg = () => {
+    const co = n0($('#eCosto', el).value), pr = n0($('#ePrecio', el).value), ex = sum(extrasSel(), e => e.valor), fin = pr + ex;
+    $('#eMg', el).textContent = pr ? `margen ${pct((fin - co - ex) / fin)} · ganas ${money(pr - co)}` : '';
+    $('#eFinal', el).innerHTML = ex ? `Precio final al cliente: ${money(pr)} + ${money(ex)} de costos adicionales = <b style="font-size:15px">${money(fin)}</b>` : '';
+  };
+  $('#eCosto', el).oninput = $('#ePrecio', el).oninput = updMg;
+  $$('#eEx button', el).forEach(b => b.onclick = () => { b.classList.toggle('on'); updMg(); });
+  updMg();
   $('#eFoto', el).onclick = () => $('#eFile', el).click();
   $('#eFile', el).onchange = async e => { const f = e.target.files[0]; if (!f) return; d.foto = await leerImagen(f, 600); $('#eFoto', el).innerHTML = `<img src="${d.foto}">`; };
   $('#eFoto', el).addEventListener('dragover', e => e.preventDefault());
@@ -713,7 +732,9 @@ function editarProducto(p, onSaved) {
     const otros = new Set(DB.productos.filter(x => x !== p).flatMap(x => x.variantes.map(v => v.sku)));
     const dup = rows.find(r => otros.has(r.sku)); if (dup) { toast(`El código ${dup.sku} ya lo usa otro producto`, 'bad'); return; }
     const prod = p || { id: uid(), creado: nowISO(), activo: true, variantes: [] };
-    Object.assign(prod, { ref, nombre, categoria: $('#eCat', el).value, proveedorId: $('#eProv', el).value, costo: n0($('#eCosto', el).value), precio: n0($('#ePrecio', el).value), foto: d.foto, notas: $('#eNotas', el).value.trim() });
+    const base = n0($('#ePrecio', el).value), extras = extrasSel();
+    Object.assign(prod, { ref, nombre, categoria: $('#eCat', el).value, proveedorId: $('#eProv', el).value, costo: n0($('#eCosto', el).value), precio: base + sum(extras, e => e.valor), foto: d.foto, notas: $('#eNotas', el).value.trim() });
+    if (extras.length) Object.assign(prod, { precioBase: base, extras }); else { delete prod.precioBase; delete prod.extras; }
     const keep = [];
     rows.forEach(r => {
       if (r._ex) { const v = varById(prod, r.id); Object.assign(v, { talla: r.talla, color: r.color, sku: r.sku, minimo: r.minimo === '' ? '' : n0(r.minimo) }); keep.push(v); }
@@ -737,7 +758,7 @@ V.entradas = {
     const list = DB.compras.slice().reverse();
     return `<div class="toolbar"><span class="muted">Registra aquí la mercancía que llega del proveedor: suma stock y actualiza el costo.</span><span class="sp"></span><button class="btn pri" id="cNew">${ic('plus')} Nueva entrada</button></div>
     <div class="card" style="padding:6px 8px"><div class="tw">${list.length ? `<table class="t"><thead><tr><th>Nº</th><th>Fecha</th><th>Proveedor</th><th>Factura</th><th class="r">Prendas</th><th class="r">Total</th><th></th></tr></thead><tbody>
-      ${list.map(c => `<tr class="click ${c.anulada ? 'dim' : ''}" data-id="${c.id}"><td class="b">${c.num}</td><td>${fFecha(c.fecha)}</td><td>${esc(provById(c.proveedorId)?.nombre || '—')}</td><td>${esc(c.factura || '')}</td><td class="r">${int(sum(c.items, i => i.cant))}</td><td class="r b">${money(c.total)}</td><td>${c.anulada ? '<span class="badge bad">Anulada</span>' : ''}</td></tr>`).join('')}</tbody></table>`
+      ${list.map(c => `<tr class="click ${c.anulada ? 'dim' : ''}" data-id="${c.id}"><td class="b">${c.num}</td><td>${fFecha(c.fecha)}</td><td>${esc(provById(c.proveedorId)?.nombre || '—')}</td><td>${esc(c.factura || '')}</td><td class="r">${int(sum(c.items, i => i.cant))}</td><td class="r b">${money(c.total)}</td><td>${c.anulada ? '<span class="badge bad">Anulada</span>' : c.totalEditado ? '<span class="badge warn" title="Total corregido a mano">editado</span>' : ''}</td></tr>`).join('')}</tbody></table>`
       : '<div class="empty"><h3>Sin entradas</h3><p>Cuando llegue mercancía, regístrala con “Nueva entrada”.</p></div>'}</div></div>`;
   },
   bind(m) {
@@ -814,9 +835,24 @@ function nuevaEntrada() {
 function verCompra(c) {
   const m = modal({ title: `Entrada ${c.num}`, size: 'mid', body: `<p class="muted" style="margin-top:0">${fFecha(c.fecha)} · ${esc(provById(c.proveedorId)?.nombre || 'Sin proveedor')}${c.factura ? ' · Factura ' + esc(c.factura) : ''}${c.nota ? '<br>' + esc(c.nota) : ''}</p>
     <table class="t"><thead><tr><th>Producto</th><th>Variante</th><th class="r">Cant.</th><th class="r">Costo</th><th class="r">Subtotal</th></tr></thead><tbody>${c.items.map(i => `<tr><td>${esc(i.nombre)}</td><td>${esc(i.variante)}</td><td class="r">${i.cant}</td><td class="r">${money(i.costo)}</td><td class="r">${money(i.cant * i.costo)}</td></tr>`).join('')}</tbody>
-    <tfoot><tr><td colspan="4">Total</td><td class="r">${money(c.total)}</td></tr></tfoot></table>
+    <tfoot>${c.totalEditado ? `<tr><td colspan="4" class="muted">Suma de las prendas</td><td class="r muted">${money(sum(c.items, i => i.cant * i.costo))}</td></tr>` : ''}<tr><td colspan="4">Total${c.totalEditado ? ' <span class="badge warn">editado</span>' : ''}</td><td class="r">${money(c.total)}</td></tr></tfoot></table>
+    ${c.totalEditado ? `<p class="muted small">Total corregido el ${fHora(c.totalEditado)}${c.totalNota ? ': ' + esc(c.totalNota) : ''}.</p>` : ''}
     ${c.anulada ? `<p class="note">Anulada el ${fHora(c.anuladaFecha)}.</p>` : ''}
-    <div class="mfoot">${c.anulada ? '' : '<button class="btn danger sp" id="aAnular">Anular entrada</button>'}<button class="btn pri" data-close>Cerrar</button></div>` });
+    <div class="mfoot">${c.anulada ? '' : '<button class="btn danger sp" id="aAnular">Anular entrada</button>'}${!c.anulada && ADM() ? `<button class="btn" id="aTotal">${ic('edit')} Editar total</button>` : ''}<button class="btn pri" data-close>Cerrar</button></div>` });
+  if ($('#aTotal', m.el)) $('#aTotal', m.el).onclick = () => {
+    const calc = sum(c.items, i => i.cant * i.costo);
+    const t = modal({ title: `Editar total · ${c.num}`, body: `<p class="muted" style="margin-top:0">Suma de las prendas: <b>${money(calc)}</b>. Corrige aquí el total real de la entrada (lo que pagaste).<br>No cambia el stock ni el costo de los productos.</p>
+      <div class="fgrid"><label class="f">Total de la entrada<input class="inp" type="number" min="0" step="100" id="etT" value="${c.total}"></label>
+      <label class="f">Motivo (opcional)<input class="inp" id="etN" value="${esc(c.totalNota || '')}" placeholder="Ej: me equivoqué al digitar"></label></div>
+      <div class="mfoot"><button class="btn ghost" data-close>Cancelar</button><button class="btn pri" id="etOk">Guardar total</button></div>` });
+    $('#etOk', t.el).onclick = async () => {
+      if ($('#etT', t.el).value === '') { toast('Escribe el total', 'bad'); return; }
+      const nuevo = Math.max(0, Math.round(n0($('#etT', t.el).value)));
+      if (nuevo === calc) { c.total = calc; delete c.totalEditado; delete c.totalNota; }
+      else { c.total = nuevo; c.totalEditado = nowISO(); c.totalNota = $('#etN', t.el).value.trim(); }
+      await save(); t.close(); m.close(); toast(`Total de ${c.num}: ${money(c.total)}`); render(); verCompra(c);
+    };
+  };
   if ($('#aAnular', m.el)) $('#aAnular', m.el).onclick = async () => {
     const falta = c.items.find(i => { const v = varById(prodById(i.pid), i.vid); return !v || n0(v.stock) < i.cant; });
     if (falta) { toast(`No se puede anular: ya no hay stock suficiente de ${falta.nombre} (${falta.variante})`, 'bad'); return; }
@@ -824,6 +860,67 @@ function verCompra(c) {
     c.items.forEach(i => { const p = prodById(i.pid); registrarMov(p, varById(p, i.vid), -i.cant, 'anulcompra', { doc: c.num }); });
     c.anulada = true; c.anuladaFecha = nowISO();
     await save(); m.close(); toast('Entrada anulada'); render();
+  };
+}
+
+/* =========================================================
+   REGISTRO DE INVERSIÓN (dinero invertido por proveedor · solo administrador)
+   Eliminar = marcarla "borrada": el documento no se borra de la nube
+   (así una versión vieja de la app en otro equipo no la puede borrar).
+   ========================================================= */
+const IF = { prov: '' };
+const invActivas = () => DB.inversiones.filter(x => !x.borrada);
+const invProv = x => provById(x.proveedorId)?.nombre || x.provNombre || '—';
+V.inversion = {
+  title: 'Registro de inversión',
+  html() {
+    const todas = invActivas(), list = todas.filter(x => !IF.prov || x.proveedorId === IF.prov).sort((a, b) => b.fecha.localeCompare(a.fecha));
+    const mes = hoyK().slice(0, 8) + '01';
+    const porProv = {}; todas.forEach(x => { const k = invProv(x); porProv[k] = (porProv[k] || 0) + n0(x.monto); });
+    return `<div class="toolbar"><select class="inp" id="iProv"><option value="">Todos los proveedores</option>${DB.proveedores.map(x => `<option value="${x.id}" ${IF.prov === x.id ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select>
+      <span class="sp"></span><button class="btn" id="iExp">${ic('down')} Exportar</button><button class="btn pri" id="iNew">${ic('plus')} Nueva inversión</button></div>
+    <div class="grid g3">
+      <div class="card kpi acc"><div class="l">Total invertido${IF.prov ? ' · ' + esc(provById(IF.prov)?.nombre || '') : ''}</div><div class="v">${money(sum(list, x => x.monto))}</div><div class="s">${list.length} registros</div></div>
+      <div class="card kpi"><div class="l">Este mes</div><div class="v">${money(sum(list.filter(x => dk(x.fecha) >= mes), x => x.monto))}</div><div class="s">desde el ${fFecha(mes + 'T12:00')}</div></div>
+      <div class="card"><h3>Por proveedor</h3>${hbars(Object.entries(porProv).map(([n, v]) => ({ n, v })).sort((a, b) => b.v - a.v).slice(0, 6))}</div></div>
+    <div class="card mt" style="padding:6px 8px"><div class="tw">${list.length ? `<table class="t"><thead><tr><th>Fecha</th><th>Proveedor</th><th class="r">Monto</th><th>Observación</th><th></th></tr></thead><tbody>
+      ${list.map(x => `<tr class="click" data-id="${x.id}"><td>${fFecha(x.fecha)}</td><td class="b">${esc(invProv(x))}</td><td class="r b">${money(x.monto)}</td><td class="small" style="white-space:pre-line">${esc(x.nota || '')}</td>
+      <td class="r" style="white-space:nowrap"><button class="ibtn" title="Editar">${ic('edit')}</button><button class="ibtn" data-del="${x.id}" title="Eliminar">${ic('trash')}</button></td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="2">${list.length} registros</td><td class="r">${money(sum(list, x => x.monto))}</td><td colspan="2"></td></tr></tfoot></table>`
+      : '<div class="empty"><h3>Sin inversiones</h3><p>Registra aquí el dinero que inviertes con cada proveedor con “Nueva inversión”.</p></div>'}</div></div>`;
+  },
+  bind(m) {
+    $('#iProv', m).onchange = e => { IF.prov = e.target.value; render(); };
+    $('#iNew', m).onclick = () => editarInversion(null);
+    $$('tr.click', m).forEach(tr => tr.onclick = e => { if (e.target.closest('[data-del]')) return; editarInversion(DB.inversiones.find(x => x.id === tr.dataset.id)); });
+    $$('[data-del]', m).forEach(b => b.onclick = async () => {
+      const x = DB.inversiones.find(y => y.id === b.dataset.del);
+      if (!await ask(`¿Eliminar la inversión de <b>${money(x.monto)}</b> con <b>${esc(invProv(x))}</b> del ${fFecha(x.fecha)}?`, { ok: 'Eliminar', danger: true })) return;
+      x.borrada = true; x.borradaEn = nowISO(); await save(); toast('Inversión eliminada'); render();
+    });
+    $('#iExp', m).onclick = () => exportCSV(`inversiones-${hoyK()}.csv`, [['Fecha', 'Proveedor', 'Monto', 'Observación'],
+      ...invActivas().filter(x => !IF.prov || x.proveedorId === IF.prov).sort((a, b) => a.fecha.localeCompare(b.fecha)).map(x => [fFecha(x.fecha), invProv(x), x.monto, x.nota || ''])]);
+  }
+};
+function editarInversion(x) {
+  if (!DB.proveedores.length) { toast('Primero crea el proveedor en Proveedores', 'bad'); return; }
+  const d = x || { proveedorId: IF.prov || '', fecha: nowISO(), monto: '', nota: '' };
+  const m = modal({ title: x ? 'Editar inversión' : 'Nueva inversión', body: `<div class="fgrid">
+    <label class="f s2">Proveedor<select class="inp" id="ivP"><option value="">— Elige el proveedor —</option>${DB.proveedores.map(p => `<option value="${p.id}" ${p.id === d.proveedorId ? 'selected' : ''}>${esc(p.nombre)}</option>`).join('')}</select></label>
+    <label class="f">Monto de la inversión<input class="inp" type="number" min="0" step="1000" id="ivM" value="${d.monto}"></label>
+    <label class="f">Fecha<input class="inp" type="date" id="ivF" value="${dk(d.fecha)}" max="${hoyK()}"></label>
+    <label class="f s2">Observación<textarea class="inp" id="ivN" placeholder="Ej: abono al pedido de diciembre, pago en efectivo…">${esc(d.nota || '')}</textarea></label></div>
+    <div class="mfoot"><button class="btn ghost" data-close>Cancelar</button><button class="btn pri" id="ivOk">Guardar</button></div>` });
+  $('#ivOk', m.el).onclick = async () => {
+    const prov = $('#ivP', m.el).value, monto = Math.round(n0($('#ivM', m.el).value));
+    if (!prov) { toast('Elige el proveedor', 'bad'); return; }
+    if (monto <= 0) { toast('Escribe el monto', 'bad'); $('#ivM', m.el).focus(); return; }
+    const fv = $('#ivF', m.el).value;
+    const fecha = x && fv === dk(x.fecha) ? x.fecha : dateFromInput(fv);
+    const o = x || { id: uid(), creado: nowISO() };
+    Object.assign(o, { proveedorId: prov, provNombre: provById(prov).nombre, monto, fecha, nota: $('#ivN', m.el).value.trim() });
+    if (!x) DB.inversiones.push(o); else o.editado = nowISO();
+    await save(); m.close(); toast(x ? 'Inversión actualizada' : 'Inversión registrada'); render();
   };
 }
 
@@ -1085,9 +1182,9 @@ V.proveedores = {
   title: 'Proveedores',
   html() {
     return `<div class="toolbar"><span class="sp"></span><button class="btn pri" id="prNew">${ic('plus')} Nuevo proveedor</button></div>
-      <div class="card" style="padding:6px 8px">${DB.proveedores.length ? `<table class="t"><thead><tr><th>Proveedor</th><th>Contacto</th><th>Teléfono</th><th>Correo / redes</th><th class="r">Productos</th><th class="r">Total comprado</th><th>Última entrada</th><th></th></tr></thead><tbody>
+      <div class="card" style="padding:6px 8px">${DB.proveedores.length ? `<table class="t"><thead><tr><th>Proveedor</th><th>Contacto</th><th>Teléfono</th><th>Correo / redes</th><th class="r">Productos</th><th class="r">Total comprado</th><th class="r">Invertido</th><th>Última entrada</th><th></th></tr></thead><tbody>
       ${DB.proveedores.map(p => { const cs = DB.compras.filter(c => c.proveedorId === p.id && !c.anulada); return `<tr class="click" data-id="${p.id}"><td class="b">${esc(p.nombre)}</td><td>${esc(p.contacto)}</td><td>${esc(p.telefono)}</td><td>${esc(p.email)}</td>
-      <td class="r">${DB.productos.filter(x => x.proveedorId === p.id && x.activo !== false).length}</td><td class="r">${money(sum(cs, c => c.total))}</td><td class="small">${cs.length ? fFecha(cs[cs.length - 1].fecha) : '—'}</td>
+      <td class="r">${DB.productos.filter(x => x.proveedorId === p.id && x.activo !== false).length}</td><td class="r">${money(sum(cs, c => c.total))}</td><td class="r">${money(sum(invActivas().filter(x => x.proveedorId === p.id), x => x.monto))}</td><td class="small">${cs.length ? fFecha(cs[cs.length - 1].fecha) : '—'}</td>
       <td class="r"><button class="ibtn" data-del="${p.id}">${ic('trash')}</button></td></tr>`; }).join('')}</tbody></table>`
       : '<div class="empty"><h3>Sin proveedores</h3><p>Agrega a quién le compras la mercancía para llevar el control de costos y entradas.</p></div>'}</div>`;
   },
@@ -1210,6 +1307,12 @@ V.config = {
       <div><div class="small b" style="margin-bottom:6px">Categorías</div>${tagList('lCat', c.categorias)}</div><div><div class="small b" style="margin-bottom:6px">Colores frecuentes</div>${tagList('lCol', c.colores)}</div>
       <div><div class="small b" style="margin-bottom:6px">Medios de pago</div>${tagList('lMet', c.metodos)}</div><div></div>
       <div class="s2"><div class="small b" style="margin-bottom:6px">Tallas (Colombia) <span class="muted" style="font-weight:400">— por grupo; al crear un producto se sugiere el grupo según su categoría</span></div>${c.gruposTallas.map((g, i) => `<div class="tgrp"><span class="tg-n">${esc(g.nombre)}</span>${tagList('lG' + i, g.tallas)}</div>`).join('')}</div></div></div>
+    <div class="card mt"><h3>Costos adicionales de producto</h3>
+      <p class="muted" style="margin-top:0">Marquillas, etiquetas, bolsas, envíos… Al editar un producto marcas los que lleva y su valor se suma al precio de venta (y cuenta como costo en la ganancia).</p>
+      <table class="t" style="max-width:640px"><thead><tr><th>Costo</th><th class="r">Valor por unidad</th><th class="r">Productos</th><th></th></tr></thead><tbody>
+      ${(c.costosExtra || []).map((e, i) => `<tr><td><input class="inp" data-cx="${i}" data-f="nombre" value="${esc(e.nombre)}"></td><td class="r"><input class="inp" type="number" min="0" step="50" data-cx="${i}" data-f="valor" value="${n0(e.valor)}" style="width:130px"></td>
+      <td class="r">${DB.productos.filter(p => (p.extras || []).some(x => x.id === e.id)).length}</td><td><button class="ibtn" data-cxdel="${i}" title="Quitar">${ic('trash')}</button></td></tr>`).join('')}</tbody>
+      <tfoot><tr><td><input class="inp" id="cxN" placeholder="+ nuevo costo (ej: Empaque regalo)"></td><td class="r"><input class="inp" type="number" min="0" step="50" id="cxV" placeholder="0" style="width:130px"></td><td colspan="2"><button class="btn sm pri" id="cxAdd">${ic('plus')} Agregar</button></td></tr></tfoot></table></div>
     <div class="card mt"><h3>Datos y respaldos</h3>
       <p class="muted" style="margin-top:0">Todo se guarda automáticamente en este computador, con un respaldo diario (se conservan los últimos 60 días).<br><span class="small" id="cPath"></span></p>
       <div class="toolbar"><button class="btn pri" id="cExp">${ic('down')} Exportar respaldo</button><button class="btn" id="cImp">Restaurar respaldo</button><button class="btn" id="cDir">Abrir carpeta de datos</button>
@@ -1224,6 +1327,33 @@ V.config = {
       if (['negocio', 'lema', 'acento'].includes(i.dataset.k)) { const s = $('#main').scrollTop; render(); $('#main').scrollTop = s; }
       toast('Guardado');
     });
+    const cxUsan = id => DB.productos.filter(p => (p.extras || []).some(x => x.id === id));
+    const cxRepintar = () => { const s = $('#main').scrollTop; render(); $('#main').scrollTop = s; };
+    $$('[data-cx]', m).forEach(i => i.onchange = async () => {
+      const e = c.costosExtra[+i.dataset.cx], usan = cxUsan(e.id);
+      if (i.dataset.f === 'nombre') {
+        const v = i.value.trim(); if (!v) { toast('Escribe el nombre', 'bad'); i.value = e.nombre; return; }
+        e.nombre = v; usan.forEach(p => p.extras.forEach(x => { if (x.id === e.id) x.nombre = v; }));
+        await save(); toast('Guardado'); return;
+      }
+      e.valor = Math.max(0, n0(i.value)); await save();
+      if (usan.length && await ask(`<b>${usan.length}</b> productos llevan <b>${esc(e.nombre)}</b>. ¿Actualizar su precio de venta con el nuevo valor (${money(e.valor)})?<br><span class="muted small">Si no, conservan el valor anterior hasta que los edites.</span>`, { ok: 'Actualizar precios', title: 'Costos adicionales' })) {
+        usan.forEach(p => { p.extras.forEach(x => { if (x.id === e.id) x.valor = e.valor; }); p.precio = n0(p.precioBase ?? p.precio) + extrasTot(p); });
+        await save(); toast(`${usan.length} precios actualizados`);
+      } else toast('Guardado');
+      cxRepintar();
+    });
+    $$('[data-cxdel]', m).forEach(b => b.onclick = async () => {
+      const e = c.costosExtra[+b.dataset.cxdel], usan = cxUsan(e.id);
+      if (!await ask(`¿Quitar <b>${esc(e.nombre)}</b> de la lista?${usan.length ? `<br>${usan.length} productos lo llevan: conservan su precio hasta que lo desmarques al editarlos.` : ''}`, { ok: 'Quitar', danger: true })) return;
+      c.costosExtra.splice(+b.dataset.cxdel, 1); await save(); cxRepintar();
+    });
+    $('#cxAdd', m).onclick = async () => {
+      const n = $('#cxN', m).value.trim(); if (!n) { toast('Escribe el nombre del costo', 'bad'); $('#cxN', m).focus(); return; }
+      if (c.costosExtra.some(x => norm(x.nombre) === norm(n))) { toast('Ya existe', 'bad'); return; }
+      c.costosExtra.push({ id: uid(), nombre: n, valor: Math.max(0, n0($('#cxV', m).value)) }); await save(); toast('Costo agregado'); cxRepintar();
+    };
+    $('#cxN', m).onkeydown = $('#cxV', m).onkeydown = e => { if (e.key === 'Enter') $('#cxAdd', m).click(); };
     $('#cSnd', m).onchange = async e => { c.sonidoIntro = e.target.checked; await save(); toast(e.target.checked ? 'Sonido de entrada activado' : 'Sonido de entrada desactivado'); };
     $('#cLogo', m).onclick = () => $('#cLogoF', m).click();
     $('#cLogoF', m).onchange = async e => { const f = e.target.files[0]; if (!f) return; c.logo = await leerImagen(f, 500, 'image/png'); await save(); render(); };

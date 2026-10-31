@@ -8,7 +8,7 @@
    ========================================================= */
 const NUBE = {
   sb: null, perfil: null, snap: new Map(), canal: null, subiendo: null, otraVez: false, online: true,
-  ARR: ['proveedores', 'productos', 'movimientos', 'compras', 'ventas', 'cajas', 'cajaMovs'],
+  ARR: ['proveedores', 'productos', 'movimientos', 'compras', 'ventas', 'cajas', 'cajaMovs', 'inversiones'],
   VEND: ['ventas', 'movimientos', 'cajas', 'cajaMovs'],   // lo único que sube un vendedor (el stock sale de los movimientos)
   get ok() { return !!(window.NUBE_CFG && NUBE_CFG.url && NUBE_CFG.key); },
   get admin() { return !NUBE.ok || NUBE.perfil?.rol === 'admin'; },
